@@ -15,49 +15,89 @@ A modern e-commerce web application built with React, Vite, Firebase, and Google
 
 ## 📋 Prerequisites
 
-**You only need Node.js installed!**
+Before starting, you need **Node.js** installed on your computer.
 
-- **Node.js** (version 18 or higher)
-  - Download from: https://nodejs.org/
-  - To check if you have it: Open Terminal/Command Prompt and type `node --version`
+### Installing Node.js
 
-## 🚀 Quick Start (4 Easy Steps!)
+**Check if you already have it:**
+1. Open Terminal (Mac/Linux) or Command Prompt (Windows)
+2. Type: `node --version`
+3. If you see a version number (like `v18.x.x` or higher), you're good! Skip to Quick Start.
+4. If you see "command not found" or an error, follow the steps below:
+
+**Install Node.js:**
+
+**For Windows:**
+1. Go to https://nodejs.org/
+2. Click the big green button that says "Download Node.js (LTS)"
+3. Run the downloaded installer
+4. Click "Next" through all the steps (keep default settings)
+5. Restart your computer
+6. Open Command Prompt and type `node --version` to verify
+
+**For Mac:**
+1. Go to https://nodejs.org/
+2. Click the big green button that says "Download Node.js (LTS)"
+3. Open the downloaded `.pkg` file
+4. Click "Continue" through all the steps
+5. Restart Terminal
+6. Type `node --version` to verify
+
+**For Linux (Ubuntu/Debian):**
+```bash
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version
+```
+
+## 🚀 Complete Setup Guide
 
 ### Step 1: Clone the Repository
 
 Open Terminal (Mac/Linux) or Command Prompt (Windows) and run:
 
 ```bash
-git clone <your-repository-url>
-cd nexus-store
+git clone https://github.com/maybe456/NexusStore.git
+cd NexusStore
 ```
+
+**Note:** If you get "git: command not found", install Git from https://git-scm.com/ first, then try again.
 
 ### Step 2: Add the .env File
 
-**Ask the project owner for the `.env` file** (they'll send it to you privately via email/message).
-
-Once you receive it:
-1. Copy the `.env` file
-2. Paste it in the `nexus-store` folder (the main project folder)
-3. Make sure it's named exactly `.env` (starts with a dot)
-
 ### Step 3: Install Dependencies
+
+In your Terminal/Command Prompt (make sure you're in the `NexusStore` folder):
 
 ```bash
 npm install
 ```
 
-This downloads all necessary packages. Takes 1-3 minutes.
+### Step 4: Start the Application
 
-### Step 4: Start the App
+In the same Terminal/Command Prompt window:
 
 ```bash
 npm run dev
 ```
 
-Open your browser and go to: **http://localhost:5173/**
+**What you should see:**
+```
+  VITE v7.x.x  ready in xxx ms
 
-**That's it! 🎉** The app is ready to use with a shared backend!
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+```
+
+**Keep this terminal window open!** The server needs to stay running.
+
+### Step 5: Open in Browser
+
+1. Open your web browser (Chrome, Firefox, Safari, etc.)
+2. Go to: **http://localhost:5173/**
+3. You should see the Nexus Store homepage! 🎉
+
+**To stop the server later:** Go back to the Terminal and press `Ctrl+C`
 
 ## 📝 Using the Application
 
@@ -71,50 +111,43 @@ Open your browser and go to: **http://localhost:5173/**
 
 To access admin features, you need an admin account:
 
-### Admin Features
-
-To access admin features, you need an admin account:
-
 1. Register a regular account in the app
 2. Contact the project owner to upgrade your account to admin
-3. Once upgraded, you'll see the Admin Dashboard with analytics and product management
+3. Once upgraded, you'll see the Admin Dashboard with analytics and product management.
 
-## 🛠️ Troubleshooting
-
-**"npm: command not found"**
-- Install Node.js from https://nodejs.org/
-
-**"Port 5173 is already in use"**
-- Close other apps or the server will use a different port
-
-**Blank page or errors**
-- Make sure you ran `npm install` first
-- Try: `rm -rf node_modules && npm install`
-- Restart the dev server
-
-## ⚠️ Important Notes
-
-- This app uses a **shared Firebase backend** - everyone uses the same database
-- The `.env` file contains sensitive credentials - **don't share it publicly** or commit it to GitHub
-- Be respectful: Don't delete other users' data
-- The chatbot uses a shared API key with usage limits
-- For production use, set up your own Firebase project following standard setup guides
-
-## 📂 Project Structure
 
 ```
-nexus-store/
-├── public/              # Static assets
+NexusStore/
+├── public/              # Static assets (images, icons)
 ├── src/
 │   ├── components/      # Reusable React components
-│   ├── context/         # React Context providers (Auth, Cart)
-│   ├── lib/             # Configuration files (Firebase, Gemini)
+│   │   ├── AdminRoute.jsx
+│   │   ├── Chatbot.jsx
+│   │   ├── Navbar.jsx
+│   │   └── PrivateRoute.jsx
+│   ├── context/         # React Context providers
+│   │   ├── AuthContext.jsx    # User authentication
+│   │   └── CartContext.jsx    # Shopping cart
+│   ├── lib/             # Configuration files
+│   │   ├── firebase.js        # Firebase setup
+│   │   ├── gemini.js          # AI chatbot setup
+│   │   └── categories.js      # Product categories
 │   ├── pages/           # Page components
-│   ├── assets/          # Images and other assets
+│   │   ├── Home.jsx
+│   │   ├── Shop.jsx
+│   │   ├── Cart.jsx
+│   │   ├── Login.jsx
+│   │   ├── Dashboard.jsx
+│   │   ├── Admin.jsx
+│   │   └── ProductDetails.jsx
 │   ├── App.jsx          # Main app component
 │   └── main.jsx         # Entry point
-├── .env                 # Environment variables (get from project owner)
-└── package.json         # Dependencies and scripts
+├── .env                 # Environment variables (GET FROM PROJECT OWNER!)
+├── .gitignore           # Files Git should ignore
+├── package.json         # Dependencies and scripts
+├── vite.config.js       # Vite configuration
+├── tailwind.config.js   # Tailwind CSS configuration
+└── README.md            # This file!
 ```
 
 ---
