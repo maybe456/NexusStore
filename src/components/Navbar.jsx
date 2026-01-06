@@ -1,9 +1,10 @@
 // src/components/Navbar.jsx
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ShoppingCart, Search, User, Camera, LogOut, LayoutDashboard, Settings } from "lucide-react";
+import { ShoppingCart, Search, User, Camera, LogOut, LayoutDashboard, Settings, Smartphone, Monitor } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
+import { useMobileView } from "../context/MobileViewContext";
 import { auth, db } from "../lib/firebase"; 
 import { doc, getDoc } from "firebase/firestore";
 import { analyzeImageForSearch } from "../lib/gemini"; 
@@ -11,6 +12,7 @@ import { analyzeImageForSearch } from "../lib/gemini";
 const Navbar = () => {
   const { cart } = useCart();
   const { user } = useAuth();
+  const { isMobileViewEnabled, toggleMobileView, isActualMobile } = useMobileView();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
@@ -23,6 +25,17 @@ const Navbar = () => {
   const [role, setRole] = useState("user"); 
   
   const dropdownRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Sync search input with URL
   useEffect(() => {
@@ -110,9 +123,9 @@ const Navbar = () => {
         
         <Link to="/" className="text-2xl font-bold text-blue-600">NexusStore</Link>
 
-        {/* SEARCH BAR */}
+        {/* SEARCH BAR - Desktop */}
         <div 
-          className={`hidden md:flex items-center px-4 py-2 w-1/3 transition-all relative ${
+          className={`flex items-center px-4 py-2 w-1/3 transition-all relative desktop-search ${
             isAnalyzing 
               ? "analyzing-ring" 
               : "bg-gray-100 rounded-full border focus-within:border-blue-500"
@@ -138,8 +151,9 @@ const Navbar = () => {
         </div>
 
         {/* ICONS */}
-        <div className="flex items-center space-x-6">
-          <Link to="/shop" className="hidden md:block font-medium text-gray-600 hover:text-blue-600">Shop</Link>
+        <div className="flex items-center space-x-3 md:space-x-6">
+          
+          <Link to="/shop" className="font-medium text-gray-600 hover:text-blue-600 text-sm md:text-base">Shop</Link>
           
           <Link to="/cart" className="relative text-gray-700 hover:text-blue-600 transition">
             <ShoppingCart className="w-6 h-6" />
@@ -158,7 +172,7 @@ const Navbar = () => {
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border py-2 animate-fade-in-up">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border py-2 animate-fade-in-up z-50">
                   <div className="px-4 py-2 border-b bg-gray-50">
                     <p className="text-sm font-bold text-gray-800 truncate">{user.email}</p>
                     <p className={`text-xs capitalize mt-1 ${role === 'admin' ? "text-purple-600 font-bold" : "text-gray-500"}`}>{role === 'admin' ? "Administrator" : "Customer"}</p>
@@ -171,6 +185,32 @@ const Navbar = () => {
                       <Settings className="w-4 h-4" /> Admin Panel
                     </Link>
                   )}
+                  
+                  {/* View Mode Toggle - Only on desktop */}
+                  {!isActualMobile && (
+                    <div className="border-t mt-1 pt-1">
+                      <p className="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider">Preview Mode</p>
+                      <button 
+                        onClick={() => { toggleMobileView(); setIsDropdownOpen(false); }}
+                        className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition"
+                      >
+                        {isMobileViewEnabled ? (
+                          <>
+                            <Monitor className="w-4 h-4" /> 
+                            <span>Switch to Desktop</span>
+                            <span className="ml-auto text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Mobile</span>
+                          </>
+                        ) : (
+                          <>
+                            <Smartphone className="w-4 h-4" /> 
+                            <span>Switch to Mobile</span>
+                            <span className="ml-auto text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Desktop</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  
                   <div className="border-t mt-1">
                     <button onClick={handleLogout} className="w-full text-left flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition">
                       <LogOut className="w-4 h-4" /> Log Out

@@ -52,25 +52,25 @@ const ProductDetails = () => {
   const isFashion = hasSizes(product.category);
 
   return (
-    <div className="container mx-auto p-4 md:p-10">
-      <div className="bg-white rounded-xl shadow border p-6 md:p-10 flex flex-col md:flex-row gap-10">
-        <div className="md:w-1/2 bg-gray-100 rounded-xl flex items-center justify-center p-4">
-          <img src={product.image} className="max-h-96 object-contain" />
+    <div className="container mx-auto p-4 md:p-10 product-details-page">
+      <div className="bg-white rounded-xl shadow border p-4 md:p-10 flex flex-col gap-6 product-details-card">
+        <div className="w-full bg-gray-100 rounded-xl flex items-center justify-center p-4 product-image-container">
+          <img src={product.image} className="max-h-64 md:max-h-96 object-contain w-full" />
         </div>
 
-        <div className="md:w-1/2 space-y-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-bold">{product.title}</h1>
-              <p className="text-gray-500">{product.category} &gt; {product.subCategory}</p>
+        <div className="w-full space-y-3 product-info">
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-start gap-2">
+              <h1 className="text-xl md:text-3xl font-bold flex-1">{product.title}</h1>
+              <span className={`px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap ${product.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                {product.stock > 0 ? "In Stock" : "Out of Stock"}
+              </span>
             </div>
-            <span className={`px-3 py-1 rounded-full text-sm font-bold ${product.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-              {product.stock > 0 ? "In Stock" : "Out of Stock"}
-            </span>
+            <p className="text-gray-500 text-sm">{product.category} &gt; {product.subCategory}</p>
           </div>
 
-          <p className="text-3xl font-bold text-blue-600">৳{product.price}</p>
-          <p className="text-gray-600 bg-gray-50 p-4 rounded border">{product.description}</p>
+          <p className="text-2xl md:text-3xl font-bold text-blue-600">৳{product.price}</p>
+          <p className="text-gray-600 bg-gray-50 p-3 rounded border text-sm">{product.description}</p>
 
           {/* SIZE SELECTOR (Only for Fashion) */}
           {isFashion && (

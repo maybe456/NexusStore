@@ -57,9 +57,9 @@ const Chatbot = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end chatbot-container">
       {isOpen && (
-        <div className="bg-white w-80 h-96 rounded-2xl shadow-2xl border mb-4 flex flex-col overflow-hidden animate-fade-in-up">
+        <div className="bg-white w-80 h-96 rounded-2xl shadow-2xl border mb-4 flex flex-col overflow-hidden animate-fade-in-up chatbot-window">
           <div className="bg-blue-600 p-4 text-white flex justify-between items-center font-bold">
             <span>Nexus AI Agent</span>
             <button onClick={() => setIsOpen(false)} className="hover:bg-blue-700 p-1 rounded">

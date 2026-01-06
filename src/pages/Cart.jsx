@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { db } from "../lib/firebase";
 import { collection, addDoc, doc, getDoc, setDoc } from "firebase/firestore";
 import { Link, useNavigate } from "react-router-dom";
-import { Trash2, Plus, Minus, AlertTriangle } from "lucide-react";
+import { Trash2, Plus, Minus, AlertTriangle, CreditCard, Banknote } from "lucide-react";
 
 const Cart = () => {
   const { cart, removeFromCart, addToCart, decreaseQuantity, clearCart, cartTotal } = useCart();
@@ -16,7 +16,11 @@ const Cart = () => {
   const [phone, setPhone] = useState("");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  
+  // Payment Method State
+  const [paymentMethod, setPaymentMethod] = useState("cod"); // 'cod' or 'bkash'
 
+  // Load User Data
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
@@ -35,64 +39,91 @@ const Cart = () => {
     fetchUserData();
   }, [user]);
 
-  const handleCheckout = async () => {
-    if (!user) { alert("Please login!"); navigate("/login"); return; }
-    
-    // --- SECURITY CHECK START ---
-    
-    // 1. Force refresh user data from server (Critical for Verification)
-    try {
-      await user.reload(); 
-    } catch (e) {
-      console.log("Error reloading user status", e);
-    }
+    const handleCheckout = async () => {
+        // 1. Basic Login Check
+        if (!user) { alert("Please login!"); navigate("/login"); return; }
 
-    // 2. Check Verification Status
-    if (!user.emailVerified) {
-      alert("⚠️ Security Alert\n\nYour email address has NOT been verified.\nPlease check your inbox for the verification link or go to your Dashboard to resend it.");
-      navigate("/dashboard");
-      return;
-    }
+        // 2. Security: Check Email Verification
+        try { await user.reload(); } catch (e) { console.log("Reload error", e); }
+        if (!user.emailVerified) {
+            alert("⚠️ Account Not Verified.\nPlease verify your email before placing an order.");
+            return;
+        }
 
-    // 3. Check Phone
-    if (!phone || phone.trim() === "") {
-      alert("⚠️ Contact Info Missing\n\nA phone number is required for delivery. Please enter it below.");
-      return;
-    }
+        // 3. Validation: Address & Phone
+        if (!phone || phone.trim() === "") {
+            alert("⚠️ Phone Number Missing. Required for delivery.");
+            return;
+        }
+        if (!address.trim()) { alert("Please enter shipping address."); return; }
 
-    if (!address.trim()) { alert("Please enter shipping address."); return; }
-    // --- SECURITY CHECK END ---
+        // --- PAYMENT PROCESSING START ---
+        let finalPaymentStatus = "Pending (COD)";
+        let finalPaymentMethod = "Cash on Delivery";
 
-    setIsCheckingOut(true);
+        // IF USER SELECTED BKASH
+        if (paymentMethod === "bkash") {
+            const amount = cartTotal + 120;
 
-    try {
-      await setDoc(doc(db, "users", user.uid), { 
-        address: address,
-        phone: phone 
-      }, { merge: true });
+            // A. Show Instructions
+            const confirmMsg = `PAYMENT INSTRUCTIONS:\n\n1. Open bKash App -> 'Send Money'\n2. Send ৳${amount} to: 017XXXXXXXX (Personal)\n3. Copy the TrxID.\n\nClick OK to enter the TrxID.`;
 
-      const orderData = {
-        userId: user.uid,
-        userEmail: user.email,
-        userPhone: phone,
-        items: cart,
-        totalAmount: cartTotal + 120,
-        address: address,
-        status: "Pending",
-        paymentStatus: "Pending (COD)",
-        createdAt: new Date(),
-        paymentMethod: "Cash on Delivery"
-      };
+            if (!window.confirm(confirmMsg)) return; // User clicked Cancel
 
-      await addDoc(collection(db, "orders"), orderData);
-      clearCart();
-      navigate("/success");
-    } catch (error) {
-      console.error(error);
-      alert("Checkout failed.");
-    }
-    setIsCheckingOut(false);
-  };
+            // B. Ask for TrxID
+            const trxId = window.prompt("Enter the 10-digit bKash TrxID:");
+
+            if (!trxId) return; // User pressed Cancel on prompt
+
+            // C. STRICT VALIDATION (The Fix)
+            // This checks if it is exactly 10 characters, only Letters & Numbers (No spaces, no symbols)
+            const isValidFormat = /^[A-Za-z0-9]{10}$/.test(trxId);
+
+            if (!isValidFormat) {
+                alert("❌ INVALID TRX-ID!\n\nA valid bKash TrxID must be exactly 10 characters long and contain only letters and numbers.");
+                return; // Stop the checkout
+            }
+
+            // If valid, format it properly
+            finalPaymentMethod = `bKash (TrxID: ${trxId.toUpperCase()})`;
+            finalPaymentStatus = "Verify TrxID";
+        }
+        // --- PAYMENT PROCESSING END ---
+
+        setIsCheckingOut(true);
+
+        try {
+            // 4. Save User Info
+            await setDoc(doc(db, "users", user.uid), {
+                address: address,
+                phone: phone
+            }, { merge: true });
+
+            // 5. Create the Order
+            const orderData = {
+                userId: user.uid,
+                userEmail: user.email,
+                userPhone: phone,
+                items: cart,
+                totalAmount: cartTotal + 120,
+                address: address,
+                status: "Pending",
+                // Use the variables we set above
+                paymentStatus: finalPaymentStatus,
+                paymentMethod: finalPaymentMethod,
+                createdAt: new Date()
+            };
+
+            await addDoc(collection(db, "orders"), orderData);
+            clearCart();
+            navigate("/success");
+
+        } catch (error) {
+            console.error(error);
+            alert("Checkout failed. Please try again.");
+        }
+        setIsCheckingOut(false);
+    };
 
   if (cart.length === 0) {
     return (
@@ -108,6 +139,7 @@ const Cart = () => {
       <h1 className="text-3xl font-bold mb-8 text-gray-800">Shopping Cart</h1>
       
       <div className="flex flex-col lg:flex-row gap-8">
+        {/* Cart Items */}
         <div className="flex-1 space-y-4">
           {cart.map((item) => (
             <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-4 rounded-xl shadow-sm border gap-4">
@@ -130,15 +162,15 @@ const Cart = () => {
           ))}
         </div>
 
+        {/* Checkout Box */}
         <div className="lg:w-1/3">
           <div className="bg-white p-6 rounded-xl shadow-sm border sticky top-24">
-            <h2 className="text-xl font-bold mb-4 text-gray-800">Order Summary</h2>
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Checkout Details</h2>
             
-            {/* Warning Visual */}
             {user && !user.emailVerified && (
               <div className="bg-red-50 border border-red-200 p-3 rounded-lg mb-4 text-sm text-red-800 flex items-start gap-2">
                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5"/>
-                 <span><strong>Account Not Verified.</strong> You cannot place an order until you verify your email.</span>
+                 <span><strong>Not Verified.</strong> Verify email to order.</span>
               </div>
             )}
 
@@ -150,21 +182,40 @@ const Cart = () => {
             
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number (Required)</label>
-                <input type="tel" placeholder="017..." className={`w-full p-3 border rounded-lg outline-none ${!phone && "border-red-300 ring-1 ring-red-100"}`} value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                <input type="tel" placeholder="017..." className="w-full p-3 border rounded-lg outline-none" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Address</label>
                 <textarea rows="3" placeholder="Address..." className="w-full p-3 border rounded-lg outline-none" value={address} onChange={(e) => setAddress(e.target.value)}></textarea>
               </div>
+
+              {/* PAYMENT SELECTION */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => setPaymentMethod("cod")}
+                    className={`p-3 rounded-lg border text-sm font-bold flex flex-col items-center gap-2 transition ${paymentMethod === 'cod' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <Banknote className="w-5 h-5"/> Cash on Delivery
+                  </button>
+                  <button 
+                    onClick={() => setPaymentMethod("bkash")}
+                    className={`p-3 rounded-lg border text-sm font-bold flex flex-col items-center gap-2 transition ${paymentMethod === 'bkash' ? 'bg-[#E2136E] text-white border-[#E2136E]' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <div className="flex items-center gap-1"><CreditCard className="w-5 h-5"/> bKash (Personal)</div>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <button 
-              className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition disabled:bg-gray-400"
+              className={`w-full py-3 rounded-lg font-bold text-white transition disabled:bg-gray-400 ${paymentMethod === 'bkash' ? 'bg-[#E2136E] hover:bg-[#c20f5e]' : 'bg-gray-900 hover:bg-gray-800'}`}
               onClick={handleCheckout}
               disabled={isCheckingOut || loadingProfile}
             >
-              {isCheckingOut ? "Processing..." : "Place Order (COD)"}
+              {isCheckingOut ? "Processing..." : paymentMethod === 'bkash' ? "Pay & Confirm" : "Place Order (COD)"}
             </button>
           </div>
         </div>

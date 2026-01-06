@@ -113,19 +113,19 @@ const Shop = () => {
         </select>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
         
         {/* SIDEBAR */}
-        <aside className="lg:w-64 bg-white p-6 rounded-2xl shadow-sm border h-fit top-24 lg:sticky">
-          <div className="flex items-center justify-between mb-6 border-b pb-4">
-            <h2 className="font-bold text-lg flex items-center gap-2"><Filter className="w-4 h-4"/> Filters</h2>
+        <aside className="w-full lg:w-64 bg-white p-4 lg:p-6 rounded-2xl shadow-sm border h-fit lg:sticky lg:top-24 shop-filter">
+          <div className="flex items-center justify-between mb-4 border-b pb-3">
+            <h2 className="font-bold text-base flex items-center gap-2"><Filter className="w-4 h-4"/> Filters</h2>
             <button onClick={() => {handleCategoryChange("All"); setSearchParams({});}} className="text-xs text-red-500 hover:underline">Clear</button>
           </div>
 
           {/* Category Filter */}
-          <div className="mb-6">
-            <h3 className="font-bold text-sm text-gray-700 mb-3 uppercase tracking-wider">Categories</h3>
-            <div className="space-y-2">
+          <div className="mb-4">
+            <h3 className="font-bold text-xs text-gray-700 mb-2 uppercase tracking-wider">Categories</h3>
+            <div className="space-y-1.5">
               <label className="flex items-center space-x-2 cursor-pointer group">
                 <input type="radio" name="cat" checked={selectedCategory === "All"} onChange={() => handleCategoryChange("All")} className="accent-blue-600" />
                 <span className={`text-sm ${selectedCategory==="All" ? "font-bold text-blue-600" : "text-gray-600 group-hover:text-blue-600"}`}>All</span>
@@ -140,8 +140,8 @@ const Shop = () => {
           </div>
 
           {/* Price Filter */}
-          <div className="mb-6">
-            <h3 className="font-bold text-sm text-gray-700 mb-3 uppercase tracking-wider">Price Range</h3>
+          <div className="mb-4">
+            <h3 className="font-bold text-xs text-gray-700 mb-2 uppercase tracking-wider">Price Range</h3>
             <div className="flex gap-2 items-center">
               <input type="number" className="w-full p-2 border rounded text-sm bg-gray-50" placeholder="0" value={priceRange.min} onChange={(e) => setPriceRange({ ...priceRange, min: Number(e.target.value) })} />
               <span className="text-gray-400">-</span>

@@ -1,9 +1,9 @@
 // src/pages/Admin.jsx
 import { useState, useEffect, useMemo } from "react";
 import { db } from "../lib/firebase"; 
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, writeBatch } from "firebase/firestore"; 
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore"; 
 import { generateDescription, askRealAI } from "../lib/gemini"; 
-import { Sparkles, BarChart3, Edit, Trash2, X, Database, PlusSquare, TrendingUp, Users, DollarSign, ShoppingBag, AlertTriangle, PackageCheck } from "lucide-react"; 
+import { Sparkles, Edit, Trash2, X, Database, PlusSquare, TrendingUp, DollarSign, AlertTriangle, PackageCheck, Phone, MapPin, Calendar, CreditCard, CheckCircle, Clock } from "lucide-react"; 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion } from "framer-motion";
 
@@ -15,7 +15,7 @@ const CATEGORY_TREE = {
 };
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-const STATUS_COLORS = { Pending: '#f59e0b', Processing: '#3b82f6', Shipped: '#8b5cf6', Delivered: '#10b981' };
+const STATUS_COLORS = { Pending: '#f59e0b', Processing: '#3b82f6', Shipped: '#8b5cf6', Delivered: '#10b981', Cancelled: '#ef4444' };
 
 const hasSizes = (category) => category === "Fashion";
 
@@ -44,6 +44,7 @@ const Admin = () => {
         
         const orderSnap = await getDocs(collection(db, "orders"));
         const ordersData = orderSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by date (Newest first)
         ordersData.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         setOrders(ordersData);
       } catch (error) { console.error("Error loading admin data:", error); }
@@ -63,13 +64,13 @@ const Admin = () => {
 
     orders.forEach(order => {
       revenue += order.totalAmount;
-      const date = new Date(order.createdAt.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short' });
+      const date = new Date(order.createdAt?.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short' });
       daysMap[date] = (daysMap[date] || 0) + order.totalAmount;
       
       const status = order.status || "Pending";
       statusMap[status] = (statusMap[status] || 0) + 1;
 
-      order.items.forEach(item => {
+      order.items?.forEach(item => {
         const cat = item.category || "Other";
         categoryRevenueMap[cat] = (categoryRevenueMap[cat] || 0) + (item.price * item.quantity);
         
@@ -180,6 +181,20 @@ const Admin = () => {
     setOrders(orders.map(o => o.id === oid ? { ...o, status } : o));
   };
 
+  const cancelOrder = async (oid) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+    await deleteDoc(doc(db, "orders", oid));
+    setOrders(orders.filter(o => o.id !== oid));
+  };
+
+  // Toggle Payment Status (Paid / Pending)
+  const togglePaymentStatus = async (order) => {
+    const newStatus = order.paymentStatus === "Paid" ? "Pending" : "Paid";
+    // If it was "Verify TrxID", also change it to Paid
+    await updateDoc(doc(db, "orders", order.id), { paymentStatus: newStatus });
+    setOrders(orders.map(o => o.id === order.id ? { ...o, paymentStatus: newStatus } : o));
+  };
+
   const handleAIGenerate = async () => {
     if (!formData.title) return alert("Title required");
     setAiLoading(true);
@@ -197,7 +212,7 @@ const Admin = () => {
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">Admin Command</h1>
         <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm border">
-           {["products", "orders", "analytics"].map(tab => (
+           {["analytics", "products", "orders"].map(tab => (
              <button 
                key={tab}
                onClick={() => setActiveTab(tab)} 
@@ -206,15 +221,14 @@ const Admin = () => {
                {tab}
              </button>
            ))}
-           <button onClick={handleSeed} className="px-3 py-2 text-green-600 hover:bg-green-50 rounded-lg"><Database className="w-4 h-4"/></button>
         </div>
       </div>
 
-      {/* === ANALYTICS TAB (ENHANCED) === */}
+      {/* === ANALYTICS TAB === */}
       {activeTab === "analytics" && analyticsData && (
         <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} className="space-y-6">
           
-          {/* 1. KEY METRICS ROW */}
+          {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-blue-100 relative overflow-hidden group">
                <div className="absolute right-0 top-0 p-10 bg-blue-50 rounded-bl-full opacity-50 group-hover:scale-110 transition"></div>
@@ -229,7 +243,6 @@ const Admin = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-orange-100">
                <p className="text-gray-500 text-sm font-bold uppercase tracking-wider">Low Stock Items</p>
                <h3 className="text-3xl font-black text-orange-600 mt-2">{products.filter(p => p.stock < 5).length}</h3>
-               <p className="text-xs text-orange-400 mt-1">Requires attention</p>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
                <p className="text-gray-500 text-sm font-bold uppercase tracking-wider">Avg Order Value</p>
@@ -237,10 +250,8 @@ const Admin = () => {
             </div>
           </div>
 
-          {/* 2. MAIN CHARTS ROW */}
+          {/* Charts Area */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Sales Trend */}
             <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border h-[400px]">
               <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2"><DollarSign className="w-5 h-5"/> Revenue Trend</h3>
               <ResponsiveContainer width="100%" height="85%">
@@ -259,8 +270,6 @@ const Admin = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-
-            {/* Category Pie Chart */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border h-[400px]">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Revenue by Category</h3>
               <ResponsiveContainer width="100%" height="85%">
@@ -275,59 +284,12 @@ const Admin = () => {
             </div>
           </div>
 
-          {/* 3. INVENTORY & STATUS ROW */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Low Stock Alert */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border h-[350px]">
-               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 text-red-600"><AlertTriangle className="w-5 h-5"/> Inventory Risks</h3>
-               <ResponsiveContainer width="100%" height="85%">
-                 <BarChart data={analyticsData.lowStockData} layout="vertical">
-                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false}/>
-                   <XAxis type="number" hide/>
-                   <YAxis dataKey="name" type="category" width={100} fontSize={11}/>
-                   <Tooltip cursor={{fill: 'transparent'}}/>
-                   <Bar dataKey="stock" fill="#ef4444" barSize={20} radius={[0, 4, 4, 0]} />
-                 </BarChart>
-               </ResponsiveContainer>
-            </div>
-
-            {/* Top Selling Products */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border h-[350px]">
-               <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2 text-green-600"><PackageCheck className="w-5 h-5"/> Best Sellers (Qty)</h3>
-               <ResponsiveContainer width="100%" height="85%">
-                 <BarChart data={analyticsData.topSellingData} layout="vertical">
-                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false}/>
-                   <XAxis type="number" hide/>
-                   <YAxis dataKey="name" type="category" width={100} fontSize={11}/>
-                   <Tooltip cursor={{fill: 'transparent'}}/>
-                   <Bar dataKey="sales" fill="#10b981" barSize={20} radius={[0, 4, 4, 0]} />
-                 </BarChart>
-               </ResponsiveContainer>
-            </div>
-
-            {/* Order Status */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border h-[350px]">
-               <h3 className="text-lg font-bold text-gray-800 mb-4">Order Status</h3>
-               <ResponsiveContainer width="100%" height="85%">
-                 <PieChart>
-                   <Pie data={analyticsData.statusData} cx="50%" cy="50%" outerRadius={80} dataKey="value">
-                     {analyticsData.statusData.map((entry, index) => <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || '#ccc'} />)}
-                   </Pie>
-                   <Tooltip />
-                   <Legend />
-                 </PieChart>
-               </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* 4. AI ANALYST TERMINAL (LIGHT MODE) */}
+          {/* AI ANALYST */}
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="text-purple-600 w-5 h-5 animate-pulse"/>
               <h3 className="text-lg font-bold text-gray-800">AI Business Intelligence</h3>
             </div>
-            
             <div className="bg-gray-50 rounded-xl p-4 h-48 overflow-y-auto mb-4 border border-gray-200 font-mono text-sm shadow-inner">
               {analystAnswer ? (
                 <div className="whitespace-pre-line text-gray-700 leading-relaxed">{analystAnswer}</div>
@@ -337,25 +299,23 @@ const Admin = () => {
                 </div>
               )}
             </div>
-            
             <div className="flex gap-2">
               <input 
-                className="flex-grow bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition placeholder-gray-400" 
+                className="flex-grow bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 transition placeholder-gray-400" 
                 placeholder="e.g., Which size of Nike Shoes is running low?" 
                 value={analystQuestion} 
                 onChange={e=>setAnalystQuestion(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAskAnalyst()}
               />
-              <button onClick={handleAskAnalyst} disabled={aiLoading} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-md disabled:opacity-50 disabled:shadow-none">
+              <button onClick={handleAskAnalyst} disabled={aiLoading} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-md disabled:opacity-50">
                 {aiLoading ? "Thinking..." : "Analyze"}
               </button>
             </div>
           </div>
-
         </motion.div>
       )}
 
-      {/* --- TAB: PRODUCTS --- */}
+      {/* === PRODUCTS TAB === */}
       {activeTab === "products" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
            <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-md border lg:sticky lg:top-24 z-10">
@@ -379,13 +339,124 @@ const Admin = () => {
         </div>
       )}
 
-      {/* --- TAB: ORDERS --- */}
+      {/* === ORDERS TAB (UPDATED FOR BKASH) === */}
       {activeTab === "orders" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {orders.map(o => (
-             <div key={o.id} className="bg-white p-6 rounded-xl border flex justify-between items-center shadow-sm">
-               <div><p className="font-bold">Order #{o.id.slice(0,6)}</p><p className="text-sm text-gray-500">{o.userEmail}</p></div>
-               <div className="flex flex-col items-end gap-2"><span className="font-bold">৳{o.totalAmount}</span><select value={o.status} onChange={(e) => updateOrderStatus(o.id, e.target.value)} className="bg-gray-100 p-1 rounded text-sm font-semibold"><option value="Pending">Pending</option><option value="Processing">Processing</option><option value="Shipped">Shipped</option><option value="Delivered">Delivered</option></select></div>
+             <div key={o.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+               
+               {/* Order Header */}
+               <div className="bg-gray-50 px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b">
+                 <div className="flex items-center gap-3">
+                   <div className="bg-white p-2 rounded-lg border shadow-sm">
+                      <PackageCheck className="w-6 h-6 text-blue-600" />
+                   </div>
+                   <div>
+                     <p className="font-bold text-gray-800 text-lg">Order #{o.id.slice(0,6).toUpperCase()}</p>
+                     <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <Calendar className="w-3 h-3"/> 
+                        {o.createdAt?.seconds ? new Date(o.createdAt.seconds * 1000).toLocaleString() : "Just Now"}
+                     </p>
+                   </div>
+                 </div>
+
+                 <div className="flex items-center gap-3">
+                    {/* Payment Status Badge (CLICKABLE TO TOGGLE) */}
+                    <button 
+                      onClick={() => togglePaymentStatus(o)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1 transition-all hover:scale-105 ${
+                        o.paymentStatus === "Paid" 
+                          ? "bg-green-100 text-green-700 border-green-200" 
+                          : o.paymentStatus === "Verify TrxID" 
+                            ? "bg-orange-100 text-orange-700 border-orange-200 animate-pulse" // Bright Orange for TrxID
+                            : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                      }`}
+                    >
+                      {o.paymentStatus === "Paid" ? <CheckCircle className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
+                      {o.paymentStatus || "Pending"}
+                    </button>
+
+                    {/* Order Status Dropdown */}
+                    <select 
+                      value={o.status} 
+                      onChange={(e) => updateOrderStatus(o.id, e.target.value)} 
+                      className={`px-3 py-1.5 rounded-lg text-sm font-bold border outline-none cursor-pointer ${
+                        o.status === 'Delivered' ? 'bg-green-600 text-white' : 
+                        o.status === 'Shipped' ? 'bg-purple-600 text-white' : 
+                        o.status === 'Cancelled' ? 'bg-red-600 text-white' :
+                        'bg-white text-gray-700'
+                      }`}
+                    >
+                      <option className="text-gray-900 bg-white" value="Pending">Pending</option>
+                      <option className="text-gray-900 bg-white" value="Processing">Processing</option>
+                      <option className="text-gray-900 bg-white" value="Shipped">Shipped</option>
+                      <option className="text-gray-900 bg-white" value="Delivered">Delivered</option>
+                      <option className="text-red-600 bg-white" value="Cancelled">Cancelled</option>
+                    </select>
+
+                    {/* Cancel/Delete Order Button */}
+                    <button 
+                      onClick={() => cancelOrder(o.id)}
+                      className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition"
+                      title="Delete Order"
+                    >
+                      <Trash2 className="w-4 h-4"/>
+                    </button>
+                 </div>
+               </div>
+
+               {/* Order Body */}
+               <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                 
+                 {/* Customer Info */}
+                 <div className="space-y-1">
+                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Customer</p>
+                   <p className="font-semibold text-gray-800 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                        {o.userEmail?.charAt(0).toUpperCase()}
+                      </div>
+                      {o.userEmail}
+                   </p>
+                   {o.userPhone && (
+                     <p className="text-sm text-gray-600 flex items-center gap-2 ml-1">
+                       <Phone className="w-3 h-3 text-gray-400"/> {o.userPhone}
+                     </p>
+                   )}
+                 </div>
+
+                 {/* Shipping Info */}
+                 <div className="space-y-1">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Shipping To</p>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0"/>
+                      <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-2 rounded w-full border">
+                        {o.address || "No address provided"}
+                      </p>
+                    </div>
+                 </div>
+
+                 {/* Payment & Total */}
+                 <div className="space-y-1 md:text-right">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Payment Details</p>
+                    <div className="flex flex-col md:items-end gap-1">
+                       {/* Shows TrxID specifically */}
+                       <span className={`text-sm font-semibold flex items-center gap-1 ${o.paymentMethod?.includes('bKash') ? 'text-pink-600' : 'text-gray-700'}`}>
+                          <CreditCard className="w-3 h-3"/> {o.paymentMethod || "Cash on Delivery"}
+                       </span>
+                       <span className="text-2xl font-black text-gray-900">৳{o.totalAmount}</span>
+                    </div>
+                 </div>
+               </div>
+
+               {/* Order Items */}
+               <div className="bg-gray-50 px-6 py-3 border-t text-sm text-gray-600 flex flex-wrap gap-2 items-center">
+                  <span className="font-bold mr-2">Items:</span>
+                  {o.items?.map((item, idx) => (
+                    <span key={idx} className="bg-white border px-2 py-1 rounded text-xs shadow-sm">
+                       {item.quantity}x {item.title}
+                    </span>
+                  ))}
+               </div>
              </div>
            ))}
         </div>
