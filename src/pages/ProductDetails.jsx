@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "../lib/firebase";
-import { doc, getDoc, collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { Star, ShoppingCart, AlertCircle } from "lucide-react";
 import { hasSizes } from "../lib/categories"; // Import helper
+import ReviewSection from "../components/ReviewSection";
 
 const ProductDetails = () => {
   const { id } = useParams();
@@ -108,7 +109,8 @@ const ProductDetails = () => {
         </div>
       </div>
       
-      {/* Reviews Section (Existing code...) */}
+      {/* Reviews Section */}
+      <ReviewSection productId={id} reviews={reviews} setReviews={setReviews} />
     </div>
   );
 };

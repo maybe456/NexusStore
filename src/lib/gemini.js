@@ -18,10 +18,23 @@ const fileToBase64 = async (file) => {
   });
 };
 
-// 1. REAL VISUAL SEARCH (Returns JSON Object)
-export const analyzeImageForSearch = async (file) => {
+// 1. REAL VISUAL SEARCH (Returns JSON Object) - Now accepts dynamic categories
+export const analyzeImageForSearch = async (file, categoryTree = null) => {
   try {
     const base64Data = await fileToBase64(file);
+    
+    // Format categories for the prompt (dynamic or fallback to default)
+    let categoryOptions;
+    if (categoryTree && Object.keys(categoryTree).length > 0) {
+      categoryOptions = Object.entries(categoryTree)
+        .map(([cat, subs]) => `- ${cat}: ${subs.join(", ")}`)
+        .join("\n");
+    } else {
+      // Fallback to hardcoded defaults if no categories passed
+      categoryOptions = `- Electronics: Smartphones, Laptops, Headsets, Keyboards, Mice, Cameras, Monitors
+      - Fashion: Shoes, Men's Clothing, Women's Clothing, Watches, Accessories
+      - Home: Furniture, Decor, Kitchen, Lighting`;
+    }
     
     // We give the AI the strict list of categories to choose from
     const prompt = `
@@ -29,9 +42,7 @@ export const analyzeImageForSearch = async (file) => {
       Identify the Main Category and the specific Sub-Category.
       
       Valid Options:
-      - Electronics: Smartphones, Laptops, Headsets, Keyboards, Mice, Cameras, Monitors
-      - Fashion: Shoes, Men's Clothing, Women's Clothing, Watches, Accessories
-      - Home: Furniture, Decor, Kitchen, Lighting
+      ${categoryOptions}
 
       Return ONLY a raw JSON object. Do not write markdown or explanations.
       Format: {"category": "MainCategory", "subCategory": "SubCategory"}
@@ -73,8 +84,10 @@ export const analyzeImageForSearch = async (file) => {
 
   } catch (error) {
     console.error("Visual Search Failed:", error);
-    // Fallback if AI fails
-    return { category: "Electronics", subCategory: "Smartphones" }; 
+    // Fallback if AI fails - use first category from tree or default
+    const firstCategory = categoryTree ? Object.keys(categoryTree)[0] : "Electronics";
+    const firstSub = categoryTree && categoryTree[firstCategory] ? categoryTree[firstCategory][0] : "Smartphones";
+    return { category: firstCategory, subCategory: firstSub }; 
   }
 };
 

@@ -7,7 +7,8 @@ import { useAuth } from "../context/AuthContext";
 import { useMobileView } from "../context/MobileViewContext";
 import { auth, db } from "../lib/firebase"; 
 import { doc, getDoc } from "firebase/firestore";
-import { analyzeImageForSearch } from "../lib/gemini"; 
+import { analyzeImageForSearch } from "../lib/gemini";
+import { fetchCategories } from "../lib/categories";
 
 const Navbar = () => {
   const { cart } = useCart();
@@ -19,12 +20,22 @@ const Navbar = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const [categoryTree, setCategoryTree] = useState(null);
 
   // User Data State
   const [username, setUsername] = useState("Profile");
   const [role, setRole] = useState("user"); 
   
   const dropdownRef = useRef(null);
+
+  // Fetch categories for AI detection
+  useEffect(() => {
+    const loadCategories = async () => {
+      const categories = await fetchCategories();
+      setCategoryTree(categories);
+    };
+    loadCategories();
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -85,7 +96,8 @@ const Navbar = () => {
 
     setIsAnalyzing(true);
     try {
-      const result = await analyzeImageForSearch(file);
+      // Pass dynamic categories to AI for detection
+      const result = await analyzeImageForSearch(file, categoryTree);
       // Delay to show the effect
       setTimeout(() => {
         alert(`AI Detected: ${result.subCategory} (${result.category})`);
@@ -184,31 +196,6 @@ const Navbar = () => {
                     <Link to="/admin" className="flex items-center gap-2 px-4 py-3 text-sm text-purple-600 hover:bg-purple-50 font-semibold transition" onClick={() => setIsDropdownOpen(false)}>
                       <Settings className="w-4 h-4" /> Admin Panel
                     </Link>
-                  )}
-                  
-                  {/* View Mode Toggle - Only on desktop */}
-                  {!isActualMobile && (
-                    <div className="border-t mt-1 pt-1">
-                      <p className="px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider">Preview Mode</p>
-                      <button 
-                        onClick={() => { toggleMobileView(); setIsDropdownOpen(false); }}
-                        className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition"
-                      >
-                        {isMobileViewEnabled ? (
-                          <>
-                            <Monitor className="w-4 h-4" /> 
-                            <span>Switch to Desktop</span>
-                            <span className="ml-auto text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Mobile</span>
-                          </>
-                        ) : (
-                          <>
-                            <Smartphone className="w-4 h-4" /> 
-                            <span>Switch to Mobile</span>
-                            <span className="ml-auto text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Desktop</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
                   )}
                   
                   <div className="border-t mt-1">

@@ -3,17 +3,12 @@ import { useState, useEffect, useMemo } from "react";
 import { db } from "../lib/firebase"; 
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore"; 
 import { generateDescription, askRealAI } from "../lib/gemini"; 
-import { Sparkles, Edit, Trash2, X, Database, PlusSquare, TrendingUp, DollarSign, AlertTriangle, PackageCheck, Phone, MapPin, Calendar, CreditCard, CheckCircle, Clock, Search, Filter, ArrowUpDown } from "lucide-react"; 
+import { fetchCategories, addCategory, addSubCategory, deleteCategory, removeSubCategory, DEFAULT_CATEGORY_TREE } from "../lib/categories";
+import { Sparkles, Edit, Trash2, X, Database, PlusSquare, TrendingUp, DollarSign, AlertTriangle, PackageCheck, Phone, MapPin, Calendar, CreditCard, CheckCircle, Clock, Search, Filter, ArrowUpDown, FolderPlus, Tag, Plus } from "lucide-react"; 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion } from "framer-motion";
 
 // --- INTERNAL CONSTANTS ---
-const CATEGORY_TREE = {
-  Electronics: ["Smartphones", "Laptops", "Headsets", "Keyboards", "Mice", "Cameras", "Monitors"],
-  Fashion: ["Men's Clothing", "Women's Clothing", "Shoes", "Watches", "Accessories"],
-  Home: ["Furniture", "Decor", "Kitchen", "Lighting"]
-};
-
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 const STATUS_COLORS = { Pending: '#f59e0b', Processing: '#3b82f6', Shipped: '#8b5cf6', Delivered: '#10b981', Cancelled: '#ef4444' };
 
@@ -24,6 +19,12 @@ const Admin = () => {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [editingId, setEditingId] = useState(null); 
+  
+  // Dynamic Categories State
+  const [categoryTree, setCategoryTree] = useState(DEFAULT_CATEGORY_TREE);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSubCategoryName, setNewSubCategoryName] = useState("");
+  const [selectedCategoryForSub, setSelectedCategoryForSub] = useState("");
 
   // Form State
   const [formData, setFormData] = useState({
@@ -93,6 +94,16 @@ const Admin = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch categories first
+        const categories = await fetchCategories();
+        setCategoryTree(categories);
+        
+        // Set default form values based on fetched categories
+        const firstCat = Object.keys(categories)[0] || "Electronics";
+        const firstSub = categories[firstCat]?.[0] || "";
+        setFormData(prev => ({ ...prev, category: firstCat, subCategory: firstSub }));
+        setSelectedCategoryForSub(firstCat);
+        
         const prodSnap = await getDocs(collection(db, "products"));
         setProducts(prodSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         
@@ -105,6 +116,58 @@ const Admin = () => {
     };
     fetchData();
   }, [activeTab]);
+
+  // --- CATEGORY MANAGEMENT ---
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return alert("Category name required");
+    if (categoryTree[newCategoryName]) return alert("Category already exists");
+    
+    const success = await addCategory(newCategoryName.trim());
+    if (success) {
+      setCategoryTree({ ...categoryTree, [newCategoryName.trim()]: [] });
+      setNewCategoryName("");
+      alert("Category added!");
+    }
+  };
+
+  const handleAddSubCategory = async () => {
+    if (!selectedCategoryForSub) return alert("Select a category first");
+    if (!newSubCategoryName.trim()) return alert("Subcategory name required");
+    if (categoryTree[selectedCategoryForSub]?.includes(newSubCategoryName.trim())) {
+      return alert("Subcategory already exists");
+    }
+    
+    const success = await addSubCategory(selectedCategoryForSub, newSubCategoryName.trim());
+    if (success) {
+      setCategoryTree({
+        ...categoryTree,
+        [selectedCategoryForSub]: [...(categoryTree[selectedCategoryForSub] || []), newSubCategoryName.trim()]
+      });
+      setNewSubCategoryName("");
+      alert("Subcategory added!");
+    }
+  };
+
+  const handleDeleteCategory = async (catName) => {
+    if (!window.confirm(`Delete category "${catName}" and all its subcategories?`)) return;
+    const success = await deleteCategory(catName);
+    if (success) {
+      const newTree = { ...categoryTree };
+      delete newTree[catName];
+      setCategoryTree(newTree);
+    }
+  };
+
+  const handleRemoveSubCategory = async (catName, subName) => {
+    if (!window.confirm(`Remove subcategory "${subName}"?`)) return;
+    const success = await removeSubCategory(catName, subName);
+    if (success) {
+      setCategoryTree({
+        ...categoryTree,
+        [catName]: categoryTree[catName].filter(s => s !== subName)
+      });
+    }
+  };
 
   // --- ANALYTICS ENGINE ---
   const analyticsData = useMemo(() => {
@@ -184,15 +247,17 @@ const Admin = () => {
 
   // --- CRUD HANDLERS ---
   const resetForm = () => {
-    setFormData({ title: "", price: "", category: "Electronics", subCategory: "Smartphones", image: "", description: "", stock: 10, sizes: { S: 5, M: 5, L: 5, XL: 5 } });
+    const firstCat = Object.keys(categoryTree)[0] || "Electronics";
+    const firstSub = categoryTree[firstCat]?.[0] || "";
+    setFormData({ title: "", price: "", category: firstCat, subCategory: firstSub, image: "", description: "", stock: 10, sizes: { S: 5, M: 5, L: 5, XL: 5 } });
     setEditingId(null);
   };
 
   const handleEdit = (product) => {
     setEditingId(product.id);
-    let safeCategory = "Electronics";
-    if (CATEGORY_TREE[product.category]) safeCategory = product.category;
-    let safeSub = product.subCategory || CATEGORY_TREE[safeCategory][0];
+    let safeCategory = Object.keys(categoryTree)[0] || "Electronics";
+    if (categoryTree[product.category]) safeCategory = product.category;
+    let safeSub = product.subCategory || categoryTree[safeCategory]?.[0] || "";
 
     setFormData({
       title: product.title || "",
@@ -266,7 +331,7 @@ const Admin = () => {
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">Admin Command</h1>
         <div className="flex gap-2 bg-white p-1 rounded-xl shadow-sm border">
-           {["analytics", "products", "orders"].map(tab => (
+           {["analytics", "products", "categories", "orders"].map(tab => (
              <button 
                key={tab}
                onClick={() => setActiveTab(tab)} 
@@ -380,8 +445,8 @@ const Admin = () => {
             <form onSubmit={handleSaveProduct} className="space-y-4">
               <div><label className="text-xs font-bold text-gray-500 uppercase">Title</label><input className="w-full p-2 border rounded" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required /></div>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Category</label><select className="w-full p-2 border rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value, subCategory: CATEGORY_TREE[e.target.value][0]})}>{Object.keys(CATEGORY_TREE).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Sub</label><select className="w-full p-2 border rounded" value={formData.subCategory} onChange={e => setFormData({...formData, subCategory: e.target.value})}>{CATEGORY_TREE[formData.category]?.map(sc => <option key={sc} value={sc}>{sc}</option>)}</select></div>
+                <div><label className="text-xs font-bold text-gray-500 uppercase">Category</label><select className="w-full p-2 border rounded" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value, subCategory: categoryTree[e.target.value]?.[0] || ""})}>{Object.keys(categoryTree).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                <div><label className="text-xs font-bold text-gray-500 uppercase">Sub</label><select className="w-full p-2 border rounded" value={formData.subCategory} onChange={e => setFormData({...formData, subCategory: e.target.value})}>{categoryTree[formData.category]?.map(sc => <option key={sc} value={sc}>{sc}</option>)}</select></div>
               </div>
               <div className="bg-gray-50 p-3 rounded border"><label className="text-xs font-bold text-gray-500 block mb-2 uppercase">Stock</label>{hasSizes(formData.category) ? (<div className="grid grid-cols-4 gap-2">{Object.keys(formData.sizes).map(size => (<div key={size}><span className="text-xs block text-center font-semibold text-gray-600">{size}</span><input type="number" className="w-full p-1 border rounded text-center text-sm" value={formData.sizes[size]} onChange={e => setFormData({...formData, sizes: {...formData.sizes, [size]: Number(e.target.value)}})} /></div>))}</div>) : ( <input type="number" placeholder="Total Qty" className="w-full p-2 border rounded" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} /> )}</div>
               <div className="grid grid-cols-2 gap-2"><div><label className="text-xs font-bold text-gray-500 uppercase">Price</label><input type="number" className="w-full p-2 border rounded" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} required /></div><div><label className="text-xs font-bold text-gray-500 uppercase">Image</label><input type="text" className="w-full p-2 border rounded" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} required /></div></div>
@@ -418,7 +483,7 @@ const Admin = () => {
                      onChange={(e) => setCategoryFilter(e.target.value)}
                    >
                      <option value="All">All Categories</option>
-                     {Object.keys(CATEGORY_TREE).map(cat => (
+                     {Object.keys(categoryTree).map(cat => (
                        <option key={cat} value={cat}>{cat}</option>
                      ))}
                    </select>
@@ -501,6 +566,131 @@ const Admin = () => {
              )}
            </div>
         </div>
+      )}
+
+      {/* === CATEGORIES TAB === */}
+      {activeTab === "categories" && (
+        <motion.div initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} className="space-y-6">
+          
+          {/* Add Category Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <FolderPlus className="w-5 h-5 text-blue-600" /> Add New Category
+              </h2>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Category name (e.g., Sports)" 
+                  className="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                />
+                <button 
+                  onClick={handleAddCategory}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Add
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Tag className="w-5 h-5 text-green-600" /> Add Subcategory
+              </h2>
+              <div className="flex gap-2">
+                <select 
+                  className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={selectedCategoryForSub}
+                  onChange={(e) => setSelectedCategoryForSub(e.target.value)}
+                >
+                  {Object.keys(categoryTree).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <input 
+                  type="text" 
+                  placeholder="Subcategory name" 
+                  className="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  value={newSubCategoryName}
+                  onChange={(e) => setNewSubCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddSubCategory()}
+                />
+                <button 
+                  onClick={handleAddSubCategory}
+                  className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Add
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Category List */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border">
+            <h2 className="text-lg font-bold mb-4">All Categories & Subcategories</h2>
+            <div className="space-y-4">
+              {Object.entries(categoryTree).map(([category, subCategories]) => (
+                <div key={category} className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <FolderPlus className="w-4 h-4 text-blue-600" />
+                      <span className="font-bold text-gray-800">{category}</span>
+                      <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                        {subCategories.length} subcategories
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteCategory(category)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition"
+                      title="Delete category"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    {subCategories.length === 0 ? (
+                      <p className="text-gray-400 text-sm italic">No subcategories yet</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {subCategories.map(sub => (
+                          <span 
+                            key={sub} 
+                            className="bg-gray-100 px-3 py-1.5 rounded-full text-sm flex items-center gap-2 group hover:bg-gray-200 transition"
+                          >
+                            {sub}
+                            <button 
+                              onClick={() => handleRemoveSubCategory(category, sub)}
+                              className="text-gray-400 hover:text-red-500 transition"
+                              title="Remove subcategory"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI Info */}
+          <div className="bg-purple-50 border border-purple-200 p-4 rounded-xl">
+            <div className="flex items-start gap-3">
+              <Sparkles className="w-5 h-5 text-purple-600 mt-0.5" />
+              <div>
+                <h3 className="font-bold text-purple-800">AI Image Detection</h3>
+                <p className="text-sm text-purple-700">
+                  The AI visual search will automatically use all categories and subcategories listed above when detecting products from images.
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
 
       {/* === ORDERS TAB (UPDATED FOR BKASH) === */}

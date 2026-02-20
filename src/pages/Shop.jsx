@@ -4,13 +4,21 @@ import { Link, useSearchParams } from "react-router-dom";
 import { db } from "../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { Star, Filter, X, ShoppingBag } from "lucide-react";
+import { fetchCategories } from "../lib/categories";
 
-const CATEGORIES = ["Electronics", "Fashion", "Home"];
+// Helper to calculate average rating from reviews
+const calculateAverageRating = (reviews, productId) => {
+  const productReviews = reviews.filter(r => r.productId === productId);
+  if (productReviews.length === 0) return "0.0";
+  const avg = productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length;
+  return avg.toFixed(1);
+};
 
 const Shop = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [categories, setCategories] = useState([]);
 
   // Filter States
   const [filteredProducts, setFilteredProducts] = useState([]);
@@ -21,21 +29,32 @@ const Shop = () => {
 
   // Fetch Data
   useEffect(() => {
-    const fetchProducts = async () => {
-      const querySnapshot = await getDocs(collection(db, "products"));
-      const items = querySnapshot.docs.map(doc => {
+    const fetchProductsAndReviews = async () => {
+      // Fetch products, reviews, and categories in parallel
+      const [productsSnap, reviewsSnap, categoryTree] = await Promise.all([
+        getDocs(collection(db, "products")),
+        getDocs(collection(db, "reviews")),
+        fetchCategories()
+      ]);
+      
+      // Set categories from Firestore
+      setCategories(Object.keys(categoryTree));
+      
+      const reviews = reviewsSnap.docs.map(doc => doc.data());
+      
+      const items = productsSnap.docs.map(doc => {
         const data = doc.data();
         return {
           id: doc.id,
           ...data,
-          // Random rating for demo visual
-          rating: data.rating || (Math.random() * (5 - 4) + 4).toFixed(1)
+          // Calculate actual average rating from reviews
+          rating: calculateAverageRating(reviews, doc.id)
         };
       });
       setProducts(items);
       setLoading(false);
     };
-    fetchProducts();
+    fetchProductsAndReviews();
   }, []);
 
   // Sync URL
@@ -130,7 +149,7 @@ const Shop = () => {
                 <input type="radio" name="cat" checked={selectedCategory === "All"} onChange={() => handleCategoryChange("All")} className="accent-blue-600" />
                 <span className={`text-sm ${selectedCategory==="All" ? "font-bold text-blue-600" : "text-gray-600 group-hover:text-blue-600"}`}>All</span>
               </label>
-              {CATEGORIES.map(cat => (
+              {categories.map(cat => (
                 <label key={cat} className="flex items-center space-x-2 cursor-pointer group">
                   <input type="radio" name="cat" checked={selectedCategory === cat} onChange={() => handleCategoryChange(cat)} className="accent-blue-600" />
                   <span className={`text-sm ${selectedCategory===cat ? "font-bold text-blue-600" : "text-gray-600 group-hover:text-blue-600"}`}>{cat}</span>

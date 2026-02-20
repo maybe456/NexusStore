@@ -2,11 +2,48 @@
 import { useState } from "react";
 import { db } from "../lib/firebase";
 import { collection, doc, writeBatch, getDocs } from "firebase/firestore";
-import { Database, CheckCircle, AlertTriangle } from "lucide-react";
+import { Database, CheckCircle, AlertTriangle, Star } from "lucide-react";
+
+// Demo review data for realistic reviews
+const reviewNames = [
+  "Sarah M.", "James K.", "Emma R.", "Michael T.", "Lisa P.", 
+  "David W.", "Anna S.", "Robert C.", "Mia L.", "John D.",
+  "Olivia B.", "William H.", "Sophie N.", "Daniel G.", "Rachel F."
+];
+
+const positiveReviews = [
+  "Absolutely love this product! Exceeded all my expectations.",
+  "Great quality and fast shipping. Highly recommend!",
+  "Best purchase I've made this year. Worth every penny.",
+  "Amazing product! Will definitely buy again.",
+  "Perfect! Exactly what I was looking for.",
+  "Superior quality compared to competitors. Very satisfied.",
+  "Outstanding performance and great value for money.",
+  "Exceeded my expectations in every way possible!",
+  "Five stars isn't enough - this product is incredible!",
+  "Fantastic quality and the customer service was excellent."
+];
+
+const neutralReviews = [
+  "Good product overall. Does what it's supposed to do.",
+  "Decent quality for the price. Nothing extraordinary.",
+  "It's okay. Met my basic expectations.",
+  "Average product. Neither impressed nor disappointed.",
+  "Works fine. Could be better but no major complaints.",
+  "Satisfactory purchase. Gets the job done."
+];
+
+const negativeReviews = [
+  "Not as expected. Quality could be better.",
+  "Took a while to get used to. Average at best.",
+  "Could use some improvements. Just okay for now."
+];
 
 const SeedData = () => {
   const [loading, setLoading] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [status, setStatus] = useState("Ready");
+  const [reviewStatus, setReviewStatus] = useState("Ready");
 
   const handleSeed = async () => {
     if (!window.confirm("⚠️ WARNING: This will DELETE ALL existing products and add 35 new ones. Continue?")) return;
@@ -212,34 +249,158 @@ const SeedData = () => {
     setLoading(false);
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
-        <Database className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Database Seeder</h1>
-        <p className="text-gray-500 mb-6">This tool will clear your current inventory and populate it with 35+ high-quality demo products.</p>
-        
-        {status.includes("Error") ? (
-          <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm flex items-center gap-2 justify-center">
-             <AlertTriangle className="w-4 h-4" /> {status}
-          </div>
-        ) : status === "Ready" ? (
-          <div className="bg-yellow-50 text-yellow-700 p-3 rounded mb-4 text-xs">
-            ⚠️ Warning: Existing data will be lost.
-          </div>
-        ) : (
-          <div className="bg-blue-100 text-blue-700 p-3 rounded mb-4 text-sm flex items-center gap-2 justify-center animate-pulse">
-            {status === "Done! Added 35 products." ? <CheckCircle className="w-4 h-4"/> : "⏳"} {status}
-          </div>
-        )}
+  // Generate random reviews for all products
+  const handleSeedReviews = async () => {
+    if (!window.confirm("⚠️ This will DELETE ALL existing reviews and generate new demo reviews for all products. Continue?")) return;
+    
+    setReviewsLoading(true);
+    setReviewStatus("Fetching products...");
 
-        <button 
-          onClick={handleSeed}
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition disabled:bg-gray-400"
-        >
-          {loading ? "Processing..." : "Run Script"}
-        </button>
+    try {
+      const batch = writeBatch(db);
+      
+      // 1. DELETE OLD REVIEWS
+      const oldReviews = await getDocs(collection(db, "reviews"));
+      oldReviews.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      setReviewStatus("Loading products...");
+
+      // 2. GET ALL PRODUCTS
+      const productsSnap = await getDocs(collection(db, "products"));
+      const products = productsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (products.length === 0) {
+        setReviewStatus("No products found. Seed products first!");
+        setReviewsLoading(false);
+        return;
+      }
+
+      setReviewStatus(`Generating reviews for ${products.length} products...`);
+
+      // 3. GENERATE REVIEWS FOR EACH PRODUCT
+      let totalReviews = 0;
+      products.forEach((product) => {
+        // Random number of reviews (3-8 per product)
+        const reviewCount = Math.floor(Math.random() * 6) + 3;
+        
+        for (let i = 0; i < reviewCount; i++) {
+          const ref = doc(collection(db, "reviews"));
+          
+          // Generate weighted random rating (more 4-5 stars)
+          const ratingWeight = Math.random();
+          let rating;
+          if (ratingWeight < 0.15) rating = 3; // 15% chance
+          else if (ratingWeight < 0.35) rating = 4; // 20% chance
+          else rating = 5; // 65% chance
+          
+          // Select appropriate review text
+          let reviewText;
+          if (rating === 5) {
+            reviewText = positiveReviews[Math.floor(Math.random() * positiveReviews.length)];
+          } else if (rating === 4) {
+            reviewText = [...positiveReviews, ...neutralReviews][Math.floor(Math.random() * (positiveReviews.length + neutralReviews.length))];
+          } else {
+            reviewText = neutralReviews[Math.floor(Math.random() * neutralReviews.length)];
+          }
+          
+          // Random reviewer name
+          const userName = reviewNames[Math.floor(Math.random() * reviewNames.length)];
+          
+          // Random date within last 6 months
+          const randomDays = Math.floor(Math.random() * 180);
+          const reviewDate = new Date();
+          reviewDate.setDate(reviewDate.getDate() - randomDays);
+          
+          const reviewData = {
+            productId: product.id,
+            userId: `demo-user-${Math.random().toString(36).substr(2, 9)}`,
+            userName: userName,
+            userEmail: `${userName.toLowerCase().replace(" ", "").replace(".", "")}@demo.com`,
+            rating: rating,
+            text: reviewText,
+            createdAt: reviewDate
+          };
+          
+          batch.set(ref, reviewData);
+          totalReviews++;
+        }
+      });
+
+      setReviewStatus("Writing reviews to database...");
+      await batch.commit();
+      setReviewStatus(`Done! Added ${totalReviews} reviews for ${products.length} products.`);
+      alert(`✅ Success! Generated ${totalReviews} demo reviews.`);
+
+    } catch (error) {
+      console.error("Review Seed Error:", error);
+      setReviewStatus("Error: " + error.message);
+      alert("❌ Error: " + error.message);
+    }
+    setReviewsLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <div className="flex flex-col md:flex-row gap-6 max-w-4xl w-full">
+        {/* Products Seeder Card */}
+        <div className="bg-white p-8 rounded-xl shadow-lg flex-1 text-center">
+          <Database className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Product Seeder</h1>
+          <p className="text-gray-500 mb-6">Clear inventory and populate it with 35+ high-quality demo products.</p>
+          
+          {status.includes("Error") ? (
+            <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm flex items-center gap-2 justify-center">
+               <AlertTriangle className="w-4 h-4" /> {status}
+            </div>
+          ) : status === "Ready" ? (
+            <div className="bg-yellow-50 text-yellow-700 p-3 rounded mb-4 text-xs">
+              ⚠️ Warning: Existing data will be lost.
+            </div>
+          ) : (
+            <div className="bg-blue-100 text-blue-700 p-3 rounded mb-4 text-sm flex items-center gap-2 justify-center animate-pulse">
+              {status.includes("Done") ? <CheckCircle className="w-4 h-4"/> : "⏳"} {status}
+            </div>
+          )}
+
+          <button 
+            onClick={handleSeed}
+            disabled={loading || reviewsLoading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition disabled:bg-gray-400"
+          >
+            {loading ? "Processing..." : "Seed Products"}
+          </button>
+        </div>
+
+        {/* Reviews Seeder Card */}
+        <div className="bg-white p-8 rounded-xl shadow-lg flex-1 text-center">
+          <Star className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-2">Review Seeder</h1>
+          <p className="text-gray-500 mb-6">Generate 3-8 realistic demo reviews for each product in the database.</p>
+          
+          {reviewStatus.includes("Error") ? (
+            <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm flex items-center gap-2 justify-center">
+               <AlertTriangle className="w-4 h-4" /> {reviewStatus}
+            </div>
+          ) : reviewStatus === "Ready" ? (
+            <div className="bg-yellow-50 text-yellow-700 p-3 rounded mb-4 text-xs">
+              ⚠️ Seed products first, then generate reviews.
+            </div>
+          ) : (
+            <div className="bg-yellow-100 text-yellow-700 p-3 rounded mb-4 text-sm flex items-center gap-2 justify-center animate-pulse">
+              {reviewStatus.includes("Done") ? <CheckCircle className="w-4 h-4"/> : "⏳"} {reviewStatus}
+            </div>
+          )}
+
+          <button 
+            onClick={handleSeedReviews}
+            disabled={loading || reviewsLoading}
+            className="w-full bg-yellow-500 text-white py-3 rounded-lg font-bold hover:bg-yellow-600 transition disabled:bg-gray-400"
+          >
+            {reviewsLoading ? "Generating..." : "Seed Reviews"}
+          </button>
+        </div>
       </div>
     </div>
   );
