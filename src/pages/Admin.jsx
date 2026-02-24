@@ -119,14 +119,22 @@ const Admin = () => {
 
   // --- CATEGORY MANAGEMENT ---
   const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return alert("Category name required");
-    if (categoryTree[newCategoryName]) return alert("Category already exists");
+    const trimmedName = newCategoryName.trim();
+    if (!trimmedName) return alert("Category name required");
+    if (categoryTree[trimmedName]) return alert("Category already exists");
     
-    const success = await addCategory(newCategoryName.trim());
-    if (success) {
-      setCategoryTree({ ...categoryTree, [newCategoryName.trim()]: [] });
-      setNewCategoryName("");
-      alert("Category added!");
+    try {
+      const success = await addCategory(trimmedName);
+      if (success) {
+        setCategoryTree({ ...categoryTree, [trimmedName]: [] });
+        setNewCategoryName("");
+        alert("Category added!");
+      } else {
+        alert("Failed to add category. Please check your connection and try again.");
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      alert("An error occurred while adding the category.");
     }
   };
 

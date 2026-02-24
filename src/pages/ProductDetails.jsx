@@ -4,7 +4,7 @@ import { db } from "../lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
-import { Star, ShoppingCart, AlertCircle } from "lucide-react";
+import { Star, ShoppingCart, AlertCircle, CheckCircle } from "lucide-react";
 import { hasSizes } from "../lib/categories"; // Import helper
 import ReviewSection from "../components/ReviewSection";
 
@@ -17,6 +17,7 @@ const ProductDetails = () => {
   const [selectedSize, setSelectedSize] = useState("");
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showNotification, setShowNotification] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,6 +47,10 @@ const ProductDetails = () => {
     } else {
       addToCart(product);
     }
+    
+    // Show success notification
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 2500);
   };
 
   if (loading || !product) return <div className="p-10 text-center">Loading...</div>;
@@ -53,7 +58,14 @@ const ProductDetails = () => {
   const isFashion = hasSizes(product.category);
 
   return (
-    <div className="container mx-auto p-4 md:p-10 product-details-page">
+    <div className="container mx-auto p-4 md:p-10 product-details-page relative">
+      {/* Success Notification */}
+      {showNotification && (
+        <div className="fixed top-20 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-pulse">
+          <CheckCircle className="w-5 h-5" />
+          <span className="font-medium">Added to cart successfully!</span>
+        </div>
+      )}
       <div className="bg-white rounded-xl shadow border p-4 md:p-10 flex flex-col gap-6 product-details-card">
         <div className="w-full bg-gray-100 rounded-xl flex items-center justify-center p-4 product-image-container">
           <img src={product.image} className="max-h-64 md:max-h-96 object-contain w-full" />
