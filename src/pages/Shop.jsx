@@ -23,7 +23,8 @@ const Shop = () => {
   // Filter States
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") || "All");
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 500000 });
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 100000000 }); // High default, will be adjusted after products load
+  const [maxProductPrice, setMaxProductPrice] = useState(100000000);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState("featured");
 
@@ -52,6 +53,14 @@ const Shop = () => {
         };
       });
       setProducts(items);
+      
+      // Calculate and set max price from products
+      if (items.length > 0) {
+        const highestPrice = Math.max(...items.map(p => p.price || 0));
+        setMaxProductPrice(highestPrice);
+        setPriceRange(prev => ({ ...prev, max: highestPrice }));
+      }
+      
       setLoading(false);
     };
     fetchProductsAndReviews();
@@ -71,17 +80,18 @@ const Shop = () => {
     // Search
     const query = searchParams.get("search");
     if (query) {
-      const lowerQ = query.toLowerCase();
+      const lowerQ = query.toLowerCase().trim();
       result = result.filter(p => 
-        p.title.toLowerCase().includes(lowerQ) || 
-        p.category.toLowerCase().includes(lowerQ) ||
+        p.title?.toLowerCase().includes(lowerQ) || 
+        p.category?.toLowerCase().includes(lowerQ) ||
         (p.subCategory && p.subCategory.toLowerCase().includes(lowerQ))
       );
     }
 
-    // Category
+    // Category (case-insensitive comparison with trimming)
     if (selectedCategory !== "All") {
-      result = result.filter(p => p.category === selectedCategory);
+      const selectedCatNormalized = selectedCategory.toLowerCase().trim();
+      result = result.filter(p => p.category?.toLowerCase().trim() === selectedCatNormalized);
     }
 
     // Price

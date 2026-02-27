@@ -55,9 +55,10 @@ const Admin = () => {
       );
     }
     
-    // Category filter
+    // Category filter (case-insensitive with trimming)
     if (categoryFilter !== "All") {
-      result = result.filter(p => p.category === categoryFilter);
+      const filterNormalized = categoryFilter.toLowerCase().trim();
+      result = result.filter(p => p.category?.toLowerCase().trim() === filterNormalized);
     }
     
     // Stock filter
