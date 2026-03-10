@@ -1,47 +1,21 @@
+/* ============================================
+   APP & ROOT STYLES
+   ============================================ */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* ============================================
+   MAIN APP CONTAINER
+   ============================================ */
+.app-container {
+  @apply min-h-screen bg-gray-50 text-gray-900 font-sans;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-/* Review Section Styles */
+/* ============================================
+   REVIEW SECTION STYLES
+   ============================================ */
 .review-section {
   text-align: left;
 }
@@ -56,10 +30,41 @@
 
 @media (max-width: 640px) {
   .review-section .text-4xl {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
   
   .review-section .p-4 {
     padding: 0.75rem;
   }
+}
+
+/* ============================================
+   FRAMER MOTION INTEGRATION
+   ============================================ */
+.motion-reduce * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ============================================
+   PRODUCT DETAILS PAGE
+   ============================================ */
+.product-details-page {
+  @apply relative;
+}
+
+.product-details-card {
+  @apply transition-all duration-300;
+}
+
+.product-image-container {
+  @apply relative overflow-hidden;
+}
+
+.product-image-container img {
+  @apply transition-transform duration-500;
+}
+
+.product-image-container:hover img {
+  @apply scale-105;
 }

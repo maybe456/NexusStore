@@ -15,9 +15,11 @@ import AdminRoute from "./components/AdminRoute";
 import Chatbot from "./components/Chatbot";
 import MobileSearch from "./components/MobileSearch";
 import MobileViewWrapper from "./components/MobileViewWrapper";
+import LavaLampBackground from "./components/LavaLampBackground";
 import { AuthProvider } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
 import { MobileViewProvider, useMobileView } from "./context/MobileViewContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Inner component to access mobile view context
 const AppContent = () => {
@@ -26,7 +28,8 @@ const AppContent = () => {
 
   return (
     <MobileViewWrapper>
-      <div className="min-h-screen bg-white text-gray-900 font-sans mobile-content">
+      <LavaLampBackground />
+      <div className="min-h-screen transition-colors duration-300 font-sans mobile-content relative z-10">
         <Navbar />
         <Routes>
           {/* Home is now the Landing Page */}
@@ -52,15 +55,17 @@ const AppContent = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <MobileViewProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </MobileViewProvider>
-      </CartProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CartProvider>
+          <MobileViewProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </MobileViewProvider>
+        </CartProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
